@@ -178,15 +178,31 @@ class EmprestimoController extends Emprestimo {
     */
     static async remover(req: Request, res: Response): Promise<Response> {
         try {
+            // Lê o parâmetro "id" da URL e converte para número inteiro
+            // Exemplo de URL: DELETE /emprestimo/2  →  idEmprestimo = 2
             const idEmprestimo = parseInt(req.params.id as string);
+
+            // ✅ MELHORIA: validação do ID antes de consultar o banco
+            // Se a URL receber /emprestimo/abc, parseInt retorna NaN — isNaN() detecta isso
+            // e retorna 400 (Bad Request) ao invés de causar erro silencioso no banco
+            if (isNaN(idEmprestimo)) {
+                return res.status(400).json({ mensagem: "ID inválido. Informe um número inteiro." });
+            }
+
+            // Chama o método do model para remover (logicamente) o empréstimo com o ID informado
             const resultado = await Emprestimo.removerEmprestimo(idEmprestimo);
+
             if (resultado) {
-                return res.status(200).json({ mensagem: 'Empréstimo removido com sucesso!' });
+                // Retorna mensagem de sucesso com status HTTP 200 (OK)
+                return res.status(200).json({ mensagem: "Empréstimo removido com sucesso." });
             } else {
-                return res.status(500).json({ mensagem: 'Erro ao remover empréstimo!' });
+                // ✅ MELHORIA: status 404 no lugar de 500
+                // 500 indica erro interno do servidor — mas aqui o empréstimo simplesmente não foi encontrado
+                return res.status(404).json({ mensagem: "Empréstimo não encontrado para remoção." });
             }
         } catch (error) {
-            console.log(`Erro ao remover o Empréstimo ${error}`);
+            // ✅ MELHORIA: console.error() no lugar de console.log() com contexto do controller
+            console.error(`[EmprestimoController] Erro ao remover empréstimo: ${error}`);
             return res.status(500).json({ mensagem: "Erro ao remover empréstimo." });
         }
     }

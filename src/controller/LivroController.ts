@@ -68,28 +68,46 @@ class LivroController extends Livro {
         }
     }
 
-    static async cadastrar(req: Request, res: Response) {
+    // ✅ MELHORIA: Promise<Response> adicionado na assinatura
+    static async cadastrar(req: Request, res: Response): Promise<Response> {
         try {
+            // Lê o corpo da requisição HTTP e tipifica como LivroDTO
             const dadosRecebidos: LivroDTO = req.body;
+
+            // ✅ MELHORIA: validação dos campos obrigatórios antes de tentar cadastrar
+            // Se titulo, autor, editora ou isbn não forem enviados, retorna 400 (Bad Request)
+            // Sem isso, o banco receberia valores undefined e poderia lançar um erro confuso
+            if (!dadosRecebidos.titulo || !dadosRecebidos.autor || !dadosRecebidos.editora || !dadosRecebidos.isbn) {
+                return res.status(400).json({ mensagem: "Titulo, autor, editora e isbn são obrigatórios." });
+            }
+
+            // Cria um novo objeto Livro com os dados recebidos do front-end
             const novoLivro = new Livro(
-                dadosRecebidos.titulo,
-                dadosRecebidos.autor,
-                dadosRecebidos.editora,
-                (dadosRecebidos.ano_publicacao ?? 0).toString(),
-                dadosRecebidos.isbn,
-                dadosRecebidos.quant_total,
-                dadosRecebidos.quant_disponivel,
-                dadosRecebidos.quant_aquisicao,
-                dadosRecebidos.valor_aquisicao ?? 0
+                dadosRecebidos.titulo,                              // Título do livro
+                dadosRecebidos.autor,                               // Autor do livro
+                dadosRecebidos.editora,                             // Editora do livro
+                (dadosRecebidos.ano_publicacao ?? 0).toString(),    // Ano — usa "0" se não informado
+                dadosRecebidos.isbn,                                // ISBN do livro
+                dadosRecebidos.quant_total,                         // Quantidade total de exemplares
+                dadosRecebidos.quant_disponivel,                    // Quantidade disponível para empréstimo
+                dadosRecebidos.quant_aquisicao,                     // Quantidade adquirida
+                dadosRecebidos.valor_aquisicao ?? 0                 // Valor — usa 0 se não informado
             );
+
+            // Chama o método do model para persistir o novo livro no banco de dados
             const result = await Livro.cadastrarLivro(novoLivro);
+
+            // Verifica o retorno do model: true = cadastro bem-sucedido, false = falha
             if (result) {
-                return res.status(200).json({ mensagem: "Livro cadastrado com sucesso." });
+                // ✅ MELHORIA: status 201 (Created) no lugar de 200 (OK)
+                // 201 é o status semântico correto para criação de recursos — mesmo padrão dos outros controllers
+                return res.status(201).json({ mensagem: "Livro cadastrado com sucesso." });
             } else {
                 return res.status(500).json({ mensagem: "Não foi possível cadastrar o livro no banco de dados." });
             }
         } catch (error) {
-            console.error(`Erro ao cadastrar o livro: ${error}`);
+            // ✅ MELHORIA: prefixo [LivroController] para facilitar rastreamento nos logs
+            console.error(`[LivroController] Erro ao cadastrar livro: ${error}`);
             return res.status(500).json({ mensagem: "Erro ao cadastrar o livro." });
         }
     }

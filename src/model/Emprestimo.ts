@@ -223,50 +223,77 @@ class Emprestimo {
         try {
             // Query SQL com JOIN igual ao listarEmprestimos, mas filtrando por um ID específico
             // O "$1" é o placeholder que será substituído pelo valor de id_emprestimo (proteção contra SQL Injection)
-            const querySelectEmprestimo = `SELECT e.id_emprestimo, e.id_aluno, e.id_livro,
-                       e.data_emprestimo, e.data_devolucao, e.status_emprestimo, e.status_emprestimo_registro,
-                       a.ra, a.nome, a.sobrenome, a.celular, a.email,
-                       l.titulo, l.autor, l.editora, l.isbn
+            // ✅ MELHORIA: query reformatada — cada coluna na sua própria linha
+            // facilita leitura, manutenção e comparação com o listarEmprestimos
+            const querySelectEmprestimo = `
+                SELECT
+                    e.id_emprestimo,
+                    e.id_aluno,
+                    e.id_livro,
+                    e.data_emprestimo,
+                    e.data_devolucao,
+                    e.status_emprestimo,
+                    e.status_emprestimo_registro,
+                    a.ra,
+                    a.nome,
+                    a.sobrenome,
+                    a.celular,
+                    a.email,
+                    l.titulo,
+                    l.autor,
+                    l.editora,
+                    l.isbn
                 FROM Emprestimo e
                 JOIN Aluno a ON e.id_aluno = a.id_aluno
                 JOIN Livro l ON e.id_livro = l.id_livro
-                WHERE e.id_emprestimo = $1;`;
+                WHERE e.id_emprestimo = $1;
+            `;
 
             // Executa a query passando o id_emprestimo como parâmetro (substitui o $1)
             const respostaBD = await database.query(querySelectEmprestimo, [id_emprestimo]);
 
-            // Monta o objeto EmprestimoDTO com os dados da primeira (e única) linha retornada
-            // rows[0] acessa a primeira linha do resultado
+            // ✅ MELHORIA: verificação explícita antes de acessar rows[0]
+            // Sem essa verificação, se nenhuma linha for retornada, o acesso a rows[0]
+            // lança um erro do tipo "Cannot read properties of undefined"
+            if (respostaBD.rows.length === 0) {
+                return null;
+            }
+
+            // Desestrutura a primeira (e única) linha para evitar repetir respostaBD.rows[0] em cada campo
+            // Isso torna o código mais limpo e menos verboso
+            const linha = respostaBD.rows[0];
+
+            // Monta o objeto EmprestimoDTO com os dados da linha retornada pelo banco
             const emprestimoDTO: EmprestimoDTO = {
-                id_emprestimo: respostaBD.rows[0].id_emprestimo,
-                data_emprestimo: respostaBD.rows[0].data_emprestimo,
-                data_devolucao: respostaBD.rows[0].data_devolucao,
-                status_emprestimo: respostaBD.rows[0].status_emprestimo,
-                status_emprestimo_registro: respostaBD.rows[0].status_emprestimo_registro,
+                id_emprestimo:              linha.id_emprestimo,              // ID do empréstimo
+                data_emprestimo:            linha.data_emprestimo,            // Data do empréstimo
+                data_devolucao:             linha.data_devolucao,             // Data de devolução
+                status_emprestimo:          linha.status_emprestimo,          // Status do empréstimo
+                status_emprestimo_registro: linha.status_emprestimo_registro, // Status do registro
                 // Objeto aninhado com dados do aluno
                 aluno: {
-                    id_aluno: respostaBD.rows[0].id_aluno,
-                    ra: respostaBD.rows[0].ra,
-                    nome: respostaBD.rows[0].nome,
-                    sobrenome: respostaBD.rows[0].sobrenome,
-                    celular: respostaBD.rows[0].celular,
-                    email: respostaBD.rows[0].email
+                    id_aluno:  linha.id_aluno,   // ID do aluno
+                    ra:        linha.ra,          // Registro Acadêmico
+                    nome:      linha.nome,        // Nome do aluno
+                    sobrenome: linha.sobrenome,   // Sobrenome do aluno
+                    celular:   linha.celular,     // Celular do aluno
+                    email:     linha.email        // E-mail do aluno
                 },
                 // Objeto aninhado com dados do livro
                 livro: {
-                    id_livro: respostaBD.rows[0].id_livro,
-                    titulo: respostaBD.rows[0].titulo,
-                    autor: respostaBD.rows[0].autor,
-                    editora: respostaBD.rows[0].editora,
-                    isbn: respostaBD.rows[0].isbn
+                    id_livro: linha.id_livro, // ID do livro
+                    titulo:   linha.titulo,   // Título do livro
+                    autor:    linha.autor,    // Autor do livro
+                    editora:  linha.editora,  // Editora do livro
+                    isbn:     linha.isbn      // ISBN do livro
                 }
             };
 
             // Retorna o objeto empréstimo montado com os dados do banco
             return emprestimoDTO;
         } catch (error) {
-            // Exibe o erro no console e retorna null em caso de falha
-            console.error(`Erro ao realizar consulta: ${error}`);
+            // ✅ MELHORIA: mensagem de erro mais descritiva com contexto do método
+            console.error(`[EmprestimoModel] Erro ao buscar empréstimo ID ${id_emprestimo}: ${error}`);
             return null;
         }
     }
@@ -279,19 +306,31 @@ class Emprestimo {
         try {
             // Query SQL de inserção — os "$1" a "$5" serão substituídos pelos valores reais
             // "RETURNING id_emprestimo" faz o banco retornar o ID gerado automaticamente após o INSERT
+            // ✅ MELHORIA: VALUES e RETURNING em linhas separadas — mais fácil de adicionar campos futuramente
             const queryInsertEmprestimo = `
                 INSERT INTO Emprestimo (id_aluno, id_livro, data_emprestimo, data_devolucao, status_emprestimo)
-                VALUES ($1, $2, $3, $4, $5) RETURNING id_emprestimo;
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING id_emprestimo;
             `;
 
-            // Organiza os valores do objeto emprestimo em um array, na mesma ordem dos placeholders ($1, $2...)
-            // Repare que aqui os atributos privados são acessados diretamente (sem getter) — isso funciona dentro da própria classe
-            const valores = [emprestimo.id_aluno, emprestimo.id_livro, emprestimo.data_emprestimo, emprestimo.data_devolucao, emprestimo.status_emprestimo];
+            // ✅ MELHORIA: array de valores com cada item na sua própria linha
+            // Organiza os valores na mesma ordem dos placeholders ($1, $2...)
+            // Os atributos privados são acessados diretamente (sem getter) — isso funciona dentro da própria classe
+            const valores = [
+                emprestimo.id_aluno,         // $1 — ID do aluno
+                emprestimo.id_livro,         // $2 — ID do livro
+                emprestimo.data_emprestimo,  // $3 — Data do empréstimo
+                emprestimo.data_devolucao,   // $4 — Data de devolução
+                emprestimo.status_emprestimo // $5 — Status do empréstimo
+            ];
+
             // Executa a query passando o array de valores e armazena o resultado
             const resultado = await database.query(queryInsertEmprestimo, valores);
 
-            // Se rowCount for diferente de 0, pelo menos uma linha foi inserida — o cadastro foi bem-sucedido
-            if (resultado.rowCount != 0) {
+            // ✅ MELHORIA: rowCount com ?? 0 para tratar o caso em que rowCount vem null
+            // "rowCount" pode ser null em alguns cenários do driver pg —
+            // o operador "??" garante que null seja tratado como 0, evitando comparações inesperadas
+            if ((resultado.rowCount ?? 0) > 0) {
                 // Exibe no console o ID do empréstimo recém-criado
                 console.log(`Empréstimo cadastrado com sucesso! ID: ${resultado.rows[0].id_emprestimo}`);
                 // Retorna true para indicar sucesso
@@ -303,7 +342,7 @@ class Emprestimo {
 
         } catch (error) {
             // Exibe o erro no console e retorna false em caso de exceção
-            console.error(`Erro ao cadastrar empréstimo: ${error}`);
+            console.error(`[EmprestimoModel] Erro ao cadastrar empréstimo: ${error}`);
             return false;
         }
     }

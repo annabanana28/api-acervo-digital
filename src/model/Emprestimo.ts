@@ -418,17 +418,22 @@ class Emprestimo {
         try {
             // Query de remoção lógica — usa UPDATE para desativar o registro em vez de DELETE
             // Isso preserva o histórico de empréstimos no banco de dados
-            const queryDeleteEmprestimo = `UPDATE emprestimo 
-                                            SET status_emprestimo_registro = FALSE
-                                            WHERE id_emprestimo=$1`;
+            // ✅ MELHORIA: query reformatada — SET e WHERE em linhas separadas
+            // facilita leitura e mantém consistência com os outros métodos do arquivo
+            const queryDeleteEmprestimo = `
+                UPDATE emprestimo
+                SET status_emprestimo_registro = FALSE
+                WHERE id_emprestimo = $1;
+            `;
 
             // Executa a query passando o ID do empréstimo como parâmetro (substitui o $1)
             const respostaBD = await database.query(queryDeleteEmprestimo, [id_emprestimo]);
 
-            // Verifica se pelo menos uma linha foi afetada pelo UPDATE
-            if (respostaBD.rowCount != 0) {
+            // ✅ MELHORIA: rowCount com ?? 0 para tratar o caso em que rowCount vem null
+            // Se o resultado for maior que 0, pelo menos uma linha foi desativada — sucesso
+            if ((respostaBD.rowCount ?? 0) > 0) {
                 // Exibe mensagem de sucesso no console
-                console.log('Empréstimo removido com sucesso!');
+                console.log(`Empréstimo ID ${id_emprestimo} removido com sucesso!`);
                 // Retorna true para indicar que a remoção foi bem-sucedida
                 return true;
             }
@@ -437,8 +442,9 @@ class Emprestimo {
             return false;
 
         } catch (error) {
-            // Exibe o erro no console e retorna false em caso de falha
-            console.log(`Erro ao remover empréstimo: ${error}`);
+            // ✅ MELHORIA: console.error() no lugar de console.log()
+            // Direciona o erro para o canal correto (stderr) e indica gravidade
+            console.error(`[EmprestimoModel] Erro ao remover empréstimo: ${error}`);
             return false;
         }
     }

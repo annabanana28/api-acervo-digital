@@ -40,14 +40,37 @@ class EmprestimoController extends Emprestimo {
     /**
      * Retorna informações de um empréstimo
      */
-    static async emprestimo(req: Request, res: Response) {
+    // ✅ MELHORIA: Promise<Response> adicionado na assinatura
+    // todos os caminhos retornam uma resposta HTTP — tipar isso explicitamente é mais profissional
+    static async emprestimo(req: Request, res: Response): Promise<Response> {
         try {
+            // Lê o parâmetro "id" da URL e converte para número inteiro
             const idEmprestimo: number = parseInt(req.params.id as string);
+
+            // ✅ MELHORIA: validação do ID antes de consultar o banco
+            // Se a URL receber /emprestimo/abc, parseInt retorna NaN — isNaN() detecta isso
+            // e retorna 400 (Bad Request) ao invés de causar erro silencioso no banco
+            if (isNaN(idEmprestimo)) {
+                return res.status(400).json({ mensagem: "ID inválido. Informe um número inteiro." });
+            }
+
+            // Chama o método do model passando o ID para buscar o empréstimo específico no banco
             const emprestimo = await Emprestimo.listarEmprestimo(idEmprestimo);
-            res.status(200).json(emprestimo);
+
+            // ✅ MELHORIA: verificação explícita se o empréstimo foi encontrado
+            // Se o model retornar null, responde com 404 (Not Found)
+            // Sem isso, o front-end receberia "null" com status 200, o que é semanticamente incorreto
+            if (!emprestimo) {
+                return res.status(404).json({ mensagem: "Empréstimo não encontrado." });
+            }
+
+            // Retorna o objeto do empréstimo em JSON com status HTTP 200 (OK)
+            return res.status(200).json(emprestimo);
         } catch (error) {
-            console.log(`Erro ao acessar método herdado: ${error}`);
-            res.status(500).json("Erro ao recuperar as informações do aluno.");
+            // ✅ MELHORIA: console.error() no lugar de console.log() com contexto do controller
+            // A mensagem anterior dizia "aluno" mas este método busca empréstimos — corrigido
+            console.error(`[EmprestimoController] Erro ao buscar empréstimo: ${error}`);
+            return res.status(500).json({ mensagem: "Erro ao recuperar as informações do empréstimo." });
         }
     }
 

@@ -124,24 +124,52 @@ class EmprestimoController extends Emprestimo {
      */
     static async atualizar(req: Request, res: Response): Promise<Response> {
         try {
-            const dadosRecebidos: EmprestimoDTO = req.body;
+            // Lê o parâmetro "id" da URL e converte para número inteiro
+            // Exemplo de URL: PUT /emprestimo/4  →  idEmprestimo = 4
             const idEmprestimo = parseInt(req.params.id as string);
+
+            // ✅ MELHORIA: validação do ID antes de qualquer operação
+            // Se a URL receber /emprestimo/abc, parseInt retorna NaN — isNaN() detecta isso
+            // e retorna 400 (Bad Request) ao invés de tentar atualizar com ID inválido
+            if (isNaN(idEmprestimo)) {
+                return res.status(400).json({ mensagem: "ID inválido. Informe um número inteiro." });
+            }
+
+            // Lê o corpo da requisição e tipifica como EmprestimoDTO
+            const dadosRecebidos: EmprestimoDTO = req.body;
+
+            // ✅ MELHORIA: validação dos campos obrigatórios antes de tentar atualizar
+            // Mesma lógica do cadastrar — evita que undefined chegue até o banco
+            if (!dadosRecebidos.aluno?.id_aluno || !dadosRecebidos.livro?.id_livro || !dadosRecebidos.data_emprestimo) {
+                return res.status(400).json({ mensagem: "id_aluno, id_livro e data_emprestimo são obrigatórios." });
+            }
+
+            // Chama o método do model passando cada campo individualmente como parâmetro
+            // Diferente do cadastrar, o atualizarEmprestimo recebe os dados separados (não um objeto Emprestimo)
             const result = await Emprestimo.atualizarEmprestimo(
-                idEmprestimo,
-                dadosRecebidos.aluno.id_aluno,
-                dadosRecebidos.livro.id_livro,
-                new Date(dadosRecebidos.data_emprestimo),
+                idEmprestimo,                                    // ID do empréstimo a ser atualizado (usado no WHERE)
+                dadosRecebidos.aluno.id_aluno,                   // Novo ID do aluno
+                dadosRecebidos.livro.id_livro,                   // Novo ID do livro
+                new Date(dadosRecebidos.data_emprestimo),        // Nova data de empréstimo convertida para Date
+                // Se data_devolucao foi informada, converte para Date; senão usa a data atual como fallback
                 dadosRecebidos.data_devolucao ? new Date(dadosRecebidos.data_devolucao) : new Date(),
-                dadosRecebidos.status_emprestimo ?? ""
+                dadosRecebidos.status_emprestimo ?? "Em Andamento" // Novo status — usa "Em Andamento" se não informado
             );
+
+            // Verifica o retorno do model: true = atualização bem-sucedida, false = falha
             if (result) {
-                return res.status(200).json({ mensagem: 'Empréstimo atualizado com sucesso.' });
+                // Retorna mensagem de sucesso com status HTTP 200 (OK)
+                return res.status(200).json({ mensagem: "Empréstimo atualizado com sucesso." });
             } else {
-                return res.status(500).json({ mensagem: 'Não foi possível cadastrar o livro no banco de dados.' });
+                // ✅ MELHORIA: status 404 no lugar de 500 + mensagem corrigida
+                // 500 indica erro interno do servidor — mas aqui o empréstimo simplesmente não foi encontrado
+                // Além disso, a mensagem original dizia "livro" sendo que este método atualiza empréstimos
+                return res.status(404).json({ mensagem: "Empréstimo não encontrado para atualização." });
             }
         } catch (error) {
-            console.error('Erro ao atualizar empréstimo:', error);
-            return res.status(500).json({ mensagem: 'Erro ao atualizar o empréstimo.' });
+            // ✅ MELHORIA: prefixo [EmprestimoController] para facilitar rastreamento nos logs
+            console.error(`[EmprestimoController] Erro ao atualizar empréstimo: ${error}`);
+            return res.status(500).json({ mensagem: "Erro ao atualizar o empréstimo." });
         }
     }
 

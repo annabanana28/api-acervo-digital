@@ -411,17 +411,21 @@ class Livro {
             if (livroConsulta && livroConsulta.status_livro) {
                 // Query SQL de atualização com 10 placeholders ($1 a $10)
                 // O $10 no WHERE garante que apenas o livro com o ID correto seja atualizado
-                const queryAtualizarLivro = `UPDATE Livro SET 
-                                titulo = $1, 
-                                autor = $2,
-                                editora = $3, 
-                                ano_publicacao = $4,
-                                isbn = $5, 
-                                quant_total = $6,
-                                quant_disponivel = $7,
-                                valor_aquisicao = $8,
-                                status_livro_emprestado = $9
-                             WHERE id_livro = $10`;
+                // ✅ MELHORIA: query reformatada — cada campo do SET na sua própria linha
+                // com os "=" alinhados verticalmente, facilitando leitura e manutenção
+                const queryAtualizarLivro = `
+                    UPDATE Livro SET
+                        titulo                  = $1,
+                        autor                   = $2,
+                        editora                 = $3,
+                        ano_publicacao          = $4,
+                        isbn                    = $5,
+                        quant_total             = $6,
+                        quant_disponivel        = $7,
+                        valor_aquisicao         = $8,
+                        status_livro_emprestado = $9
+                    WHERE id_livro = $10;
+                `;
 
                 // Organiza os novos valores em um array na mesma ordem dos placeholders
                 const valores = [
@@ -440,18 +444,19 @@ class Livro {
                 // Executa a query de atualização e armazena o resultado
                 const respostaBD = await database.query(queryAtualizarLivro, valores);
 
-                // Se rowCount for diferente de 0, a atualização funcionou — retorna true
-                if (respostaBD.rowCount != 0) {
-                    return true;
-                }
+                // ✅ MELHORIA: rowCount com ?? 0 no lugar de != 0
+                // "rowCount" pode ser null em alguns cenários do driver pg —
+                // o operador "??" garante que null seja tratado como 0, evitando comparações inesperadas
+                return (respostaBD.rowCount ?? 0) > 0;
             }
 
             // Se o livro não existe, está inativo, ou o UPDATE não afetou nenhuma linha, retorna false
             return false;
 
         } catch (error) {
-            // Exibe o erro no console e retorna false em caso de exceção
-            console.log(`Erro na consulta: ${error}`);
+            // ✅ MELHORIA: console.error() no lugar de console.log()
+            // Direciona o erro para o canal correto (stderr) e indica gravidade
+            console.error(`[LivroModel] Erro ao atualizar livro: ${error}`);
             return false;
         }
     }

@@ -146,28 +146,58 @@ class LivroController extends Livro {
 
     static async atualizar(req: Request, res: Response): Promise<Response> {
         try {
+            // Lê o parâmetro "id" da URL e converte para número inteiro
+            // Exemplo de URL: PUT /livro/7  →  idLivro = 7
             const idLivro = parseInt(req.params.id as string);
+
+            // ✅ MELHORIA: validação do ID antes de qualquer operação
+            // Se a URL receber /livro/abc, parseInt retorna NaN — isNaN() detecta isso
+            // e retorna 400 (Bad Request) ao invés de tentar atualizar com ID inválido
+            if (isNaN(idLivro)) {
+                return res.status(400).json({ mensagem: "ID inválido. Informe um número inteiro." });
+            }
+
+            // Lê o corpo da requisição e tipifica como LivroDTO
             const dadosRecebidos: LivroDTO = req.body;
+
+            // ✅ MELHORIA: validação dos campos obrigatórios antes de tentar atualizar
+            // Mesma lógica do cadastrar — evita que undefined chegue até o banco
+            if (!dadosRecebidos.titulo || !dadosRecebidos.autor || !dadosRecebidos.editora || !dadosRecebidos.isbn) {
+                return res.status(400).json({ mensagem: "Titulo, autor, editora e isbn são obrigatórios." });
+            }
+
+            // Cria um novo objeto Livro com os dados atualizados recebidos do front-end
             const livro = new Livro(
-                dadosRecebidos.titulo,
-                dadosRecebidos.autor,
-                dadosRecebidos.editora,
-                (dadosRecebidos.ano_publicacao ?? 0).toString(),
-                dadosRecebidos.isbn,
-                dadosRecebidos.quant_total,
-                dadosRecebidos.quant_disponivel,
-                dadosRecebidos.quant_aquisicao,
-                dadosRecebidos.valor_aquisicao ?? 0
+                dadosRecebidos.titulo,                              // Título do livro
+                dadosRecebidos.autor,                               // Autor do livro
+                dadosRecebidos.editora,                             // Editora do livro
+                (dadosRecebidos.ano_publicacao ?? 0).toString(),    // Ano — usa "0" se não informado
+                dadosRecebidos.isbn,                                // ISBN do livro
+                dadosRecebidos.quant_total,                         // Quantidade total de exemplares
+                dadosRecebidos.quant_disponivel,                    // Quantidade disponível para empréstimo
+                dadosRecebidos.quant_aquisicao,                     // Quantidade adquirida
+                dadosRecebidos.valor_aquisicao ?? 0                 // Valor — usa 0 se não informado
             );
+
+            // Define o ID do livro no objeto criado a partir do parâmetro já validado acima
+            // Isso é necessário para que o model saiba QUAL livro deve ser atualizado no banco
             livro.setIdLivro(idLivro);
+
+            // Chama o método do model para atualizar os dados do livro no banco de dados
             const sucesso = await Livro.atualizarLivro(livro);
+
             if (sucesso) {
+                // Retorna mensagem de sucesso com status HTTP 200 (OK)
                 return res.status(200).json({ mensagem: "Cadastro atualizado com sucesso." });
             } else {
-                return res.status(400).json({ mensagem: "Não foi possível atualizar o livro no banco de dados." });
+                // ✅ MELHORIA: status 404 no lugar de 400
+                // 400 indica requisição malformada — mas aqui os dados chegaram corretos,
+                // apenas o livro não foi encontrado ou está inativo, o que é um 404 (Not Found)
+                return res.status(404).json({ mensagem: "Livro não encontrado para atualização." });
             }
         } catch (error) {
-            console.error(`Erro ao atualizar livro: ${error}`);
+            // ✅ MELHORIA: prefixo [LivroController] para facilitar rastreamento nos logs
+            console.error(`[LivroController] Erro ao atualizar livro: ${error}`);
             return res.status(500).json({ mensagem: "Erro ao atualizar o livro." });
         }
     }

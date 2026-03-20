@@ -18,17 +18,28 @@ class AlunoController extends Aluno {
      * @returns Lista de alunos em formato JSON.
      */
     // Método estático e assíncrono — recebe a requisição HTTP e devolve a resposta com todos os alunos
-    static async todos(req: Request, res: Response) {
+    // ✅ MELHORIA: Promise<Response> adicionado na assinatura
+    // todos os caminhos retornam uma resposta HTTP — tipar isso explicitamente é mais profissional
+    static async todos(req: Request, res: Response): Promise<Response> {
         try {
             // Chama o método herdado do model Aluno para buscar todos os alunos ativos no banco
             const listaDeAlunos = await Aluno.listarAlunos();
+
+            // ✅ MELHORIA: verificação explícita se a lista está vazia
+            // Se não houver alunos cadastrados, retorna 404 (Not Found) com mensagem clara
+            // Sem isso, o front-end receberia um array vazio com status 200, sem saber se é erro ou não
+            if (listaDeAlunos.length === 0) {
+                return res.status(404).json({ mensagem: "Nenhum aluno encontrado." });
+            }
+
             // Retorna a lista em formato JSON com status HTTP 200 (OK — requisição bem-sucedida)
-            res.status(200).json(listaDeAlunos);
+            return res.status(200).json(listaDeAlunos);
         } catch (error) {
-            // Se ocorrer qualquer erro, exibe os detalhes no console do servidor para facilitar o debug
-            console.log(`Erro ao acessar método herdado: ${error}`);
-            // Retorna uma mensagem de erro em JSON com status HTTP 500 (Internal Server Error)
-            res.status(500).json("Erro ao recuperar as informações do aluno.");
+            // ✅ MELHORIA: console.error() no lugar de console.log() com contexto do controller
+            console.error(`[AlunoController] Erro ao listar alunos: ${error}`);
+            // ✅ MELHORIA: resposta de erro como objeto JSON ao invés de string simples
+            // Objeto JSON é mais fácil de tratar no front-end do que uma string solta
+            return res.status(500).json({ mensagem: "Erro ao recuperar a lista de alunos." });
         }
     }
 
@@ -39,21 +50,36 @@ class AlunoController extends Aluno {
      * @returns Informações de aluno em formato JSON.
      */
     // Método que busca um único aluno com base no ID informado na URL (ex: GET /aluno/5)
-    static async aluno(req: Request, res: Response) {
+    static async aluno(req: Request, res: Response): Promise<Response> {
         try {
             // Lê o parâmetro "id" da URL (req.params.id) e converte de string para número inteiro
             // O "as string" garante ao TypeScript que o valor existe e é uma string
             const idAluno = parseInt(req.params.id as string);
 
+            // ✅ MELHORIA: validação do ID antes de consultar o banco
+            // Se o valor não for um número válido (ex: /aluno/abc), NaN seria passado para o banco
+            // isNaN() detecta isso e retorna uma resposta adequada ao invés de causar erro silencioso
+            if (isNaN(idAluno)) {
+                return res.status(400).json({ mensagem: "ID inválido. Informe um número inteiro." });
+            }
+
             // Chama o método do model passando o ID para buscar o aluno específico no banco
             const aluno = await Aluno.listarAluno(idAluno);
+
+            // ✅ MELHORIA: verificação explícita se o aluno foi encontrado
+            // Se o model retornar null (aluno não existe), responde com 404 (Not Found)
+            // Sem isso, o front-end receberia "null" com status 200, o que é semanticamente incorreto
+            if (!aluno) {
+                return res.status(404).json({ mensagem: "Aluno não encontrado." });
+            }
+
             // Retorna o objeto do aluno em JSON com status HTTP 200 (OK)
-            res.status(200).json(aluno);
+            return res.status(200).json(aluno);
         } catch (error) {
-            // Exibe o erro no console do servidor
-            console.log(`Erro ao acessar método herdado: ${error}`);
+            // ✅ MELHORIA: console.error() no lugar de console.log()
+            console.error(`[AlunoController] Erro ao buscar aluno: ${error}`);
             // Retorna mensagem de erro com status HTTP 500
-            res.status(500).json("Erro ao recuperar as informações do aluno.");
+            return res.status(500).json({ mensagem: "Erro ao recuperar as informações do aluno." });
         }
     }
 

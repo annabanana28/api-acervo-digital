@@ -1,7 +1,7 @@
 GET http://localhost:3333/api/emprestimos
 
 ###
-GET http://localhost:3333/api/emprestimos/30
+GET http://localhost:3333/api/emprestimos/2
 
 ###
 POST http://localhost:3333/api/emprestimos
@@ -16,7 +16,7 @@ Content-Type: application/json
 }
 
 ###
-PUT http://localhost:3333/api/emprestimos/30
+PUT http://localhost:3333/api/emprestimos/3
 Content-Type: application/json
 
 {
@@ -28,4 +28,4 @@ Content-Type: application/json
 }
 
 ###
-DELETE http://localhost:3333/api/emprestimos/30
+DELETE http://localhost:3333/api/emprestimos/3

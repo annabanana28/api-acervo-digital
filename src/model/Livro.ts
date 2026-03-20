@@ -187,7 +187,6 @@ class Livro {
                     isbn,
                     quant_total,
                     quant_disponivel,
-                    quant_aquisicao,
                     valor_aquisicao,
                     status_livro_emprestado,
                     status_livro
@@ -214,7 +213,9 @@ class Livro {
                 isbn:                    livro.isbn,                    // ISBN
                 quant_total:             livro.quant_total,             // Quantidade total
                 quant_disponivel:        livro.quant_disponivel,        // Quantidade disponível
-                quant_aquisicao:         livro.quant_aquisicao,         // Quantidade de aquisição
+                // ⚠️ quant_aquisicao não existe no banco de dados — retorna null para satisfazer o DTO
+                // Para corrigir definitivamente, adicione a coluna no banco ou remova do LivroDTO
+                quant_aquisicao:         0,    // coluna não existe no banco — usa 0 como padrão
                 valor_aquisicao:         livro.valor_aquisicao,         // Valor de aquisição
                 status_livro_emprestado: livro.status_livro_emprestado, // Status de empréstimo
                 status_livro:            livro.status_livro             // Status ativo/inativo

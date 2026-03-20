@@ -337,32 +337,38 @@ class Aluno {
             if (aluno && aluno.status_aluno) {
                 // Query que desativa todos os empréstimos relacionados ao aluno
                 // Em vez de apagar, usa UPDATE para setar o status como FALSE (remoção lógica)
-                const queryDeleteEmprestimoAluno = `UPDATE emprestimo 
-                                                    SET status_emprestimo_registro = FALSE
-                                                    WHERE id_aluno=$1;`;
+                const queryDeleteEmprestimoAluno = `
+                    UPDATE emprestimo
+                    SET status_emprestimo_registro = FALSE
+                    WHERE id_aluno = $1;
+                `;
 
                 // Executa a desativação dos empréstimos do aluno
                 await database.query(queryDeleteEmprestimoAluno, [id_aluno]);
 
                 // Query que desativa o próprio aluno (também uma remoção lógica)
-                const queryDeleteAluno = `UPDATE aluno 
-                                        SET status_aluno = FALSE
-                                        WHERE id_aluno=$1;`;
+                const queryDeleteAluno = `
+                    UPDATE aluno
+                    SET status_aluno = FALSE
+                    WHERE id_aluno = $1;
+                `;
 
-                // Executa a desativação do aluno e armazena o resultado
+                // Executa a desativação do aluno e verifica se alguma linha foi afetada
                 const result = await database.query(queryDeleteAluno, [id_aluno]);
 
-                // "rowCount" indica quantas linhas foram afetadas pelo UPDATE
-                // Se for diferente de 0, significa que o aluno foi desativado com sucesso
-                return true;
+                // ✅ MELHORIA: rowCount agora é realmente usado para confirmar o sucesso
+                // Antes, o resultado era armazenado em "result" mas nunca verificado —
+                // o método retornava true mesmo que o UPDATE não afetasse nenhuma linha
+                return (result.rowCount ?? 0) > 0;
             }
 
             // Se o aluno não existir ou já estiver inativo, retorna false
             return false;
 
         } catch (error) {
-            // Exibe o erro no console e retorna false em caso de falha
-            console.log(`Erro na consulta: ${error}`);
+            // ✅ MELHORIA: console.error() no lugar de console.log()
+            // Direciona o erro para o canal correto (stderr) e indica gravidade
+            console.error(`[AlunoModel] Erro ao remover aluno: ${error}`);
             return false;
         }
     }

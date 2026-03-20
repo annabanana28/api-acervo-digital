@@ -167,51 +167,72 @@ class Livro {
      * 
      * @returns Lista com todos os livros cadastrados no banco de dados
      */
-    // Método assíncrono que busca todos os livros ativos e retorna uma lista de LivroDTO ou null
-    static async listarLivros(): Promise<Array<LivroDTO> | null> {
-        // Cria uma lista vazia que vai receber os livros encontrados no banco
-        let listaDeLivros: Array<LivroDTO> = [];
-
+    // "async" indica que este método é assíncrono — ele pode "esperar" por operações demoradas (como banco de dados)
+    // ✅ MELHORIA: retorno simplificado para LivroDTO[] (notação moderna, equivalente a Array<LivroDTO>)
+    // ✅ MELHORIA: erro é lançado ao invés de retornar null — permite que o chamador trate a falha
+    static async listarLivros(): Promise<LivroDTO[]> {
         try {
-            // Query SQL que busca todos os livros com status ativo (status_livro = TRUE)
-            // Livros com status FALSE foram removidos logicamente e não devem aparecer
-            const querySelectLivro = `SELECT * FROM Livro WHERE status_livro = TRUE;`;
+            // Bloco try: tenta executar o código; se algo der errado, vai para o catch
+
+            // ✅ MELHORIA: colunas explícitas no lugar de SELECT *
+            // SELECT * busca todas as colunas do banco — se houver colunas pesadas ou desnecessárias,
+            // isso aumenta o tráfego de dados sem necessidade. Listar as colunas é mais seguro e eficiente.
+            const querySelectLivro = `
+                SELECT
+                    id_livro,
+                    titulo,
+                    autor,
+                    editora,
+                    ano_publicacao,
+                    isbn,
+                    quant_total,
+                    quant_disponivel,
+                    quant_aquisicao,
+                    valor_aquisicao,
+                    status_livro_emprestado,
+                    status_livro
+                FROM Livro
+                WHERE status_livro = TRUE;
+            `;
 
             // Executa a query no banco de dados e aguarda o resultado
+            // "await" pausa a execução aqui até o banco responder
             const respostaBD = await database.query(querySelectLivro);
 
-            // Percorre cada linha retornada pelo banco de dados
-            // "livro" é o apelido dado a cada registro individual retornado
-            respostaBD.rows.forEach((livro) => {
-                // Monta o objeto LivroDTO com os dados da linha atual
-                // LivroDTO é um objeto simples de dados (sem métodos), diferente da classe Livro
-                const livroDTO: LivroDTO = {
-                    id_livro: livro.id_livro,                           // ID do livro
-                    titulo: livro.titulo,                               // Título
-                    autor: livro.autor,                                 // Autor
-                    editora: livro.editora,                             // Editora
-                    ano_publicacao: livro.ano_publicacao,               // Ano de publicação
-                    isbn: livro.isbn,                                   // ISBN
-                    quant_total: livro.quant_total,                     // Quantidade total
-                    quant_disponivel: livro.quant_disponivel,           // Quantidade disponível
-                    quant_aquisicao: livro.quant_aquisicao,             // Quantidade de aquisição
-                    valor_aquisicao: livro.valor_aquisicao,             // Valor de aquisição
-                    status_livro_emprestado: livro.status_livro_emprestado, // Status de empréstimo
-                    status_livro: livro.status_livro                    // Status ativo/inativo
-                };
-
-                // Adiciona o objeto LivroDTO à lista
-                listaDeLivros.push(livroDTO);
-            });
+            // ✅ MELHORIA: .map() substitui o forEach + push manual
+            // .map() percorre o array e já retorna um novo array transformado,
+            // sem precisar criar uma lista vazia e empurrar item por item.
+            // É mais legível, funcional e elimina a necessidade de uma variável mutável (let).
+            // O "any" é necessário pois o TypeScript não consegue inferir os tipos
+            // retornados pelo banco em tempo de compilação — padrão usado no restante do arquivo.
+            const listaDeLivros: LivroDTO[] = respostaBD.rows.map((livro: any): LivroDTO => ({
+                id_livro:                livro.id_livro,                // ID do livro
+                titulo:                  livro.titulo,                  // Título
+                autor:                   livro.autor,                   // Autor
+                editora:                 livro.editora,                 // Editora
+                ano_publicacao:          livro.ano_publicacao,          // Ano de publicação
+                isbn:                    livro.isbn,                    // ISBN
+                quant_total:             livro.quant_total,             // Quantidade total
+                quant_disponivel:        livro.quant_disponivel,        // Quantidade disponível
+                quant_aquisicao:         livro.quant_aquisicao,         // Quantidade de aquisição
+                valor_aquisicao:         livro.valor_aquisicao,         // Valor de aquisição
+                status_livro_emprestado: livro.status_livro_emprestado, // Status de empréstimo
+                status_livro:            livro.status_livro             // Status ativo/inativo
+            }));
 
             // Retorna a lista com todos os livros encontrados
             return listaDeLivros;
 
         } catch (error) {
-            // Se ocorrer qualquer erro durante a consulta, exibe no console para facilitar o debug
-            console.log(`Erro ao acessar o modelo: ${error}`);
-            // Retorna null para indicar que houve falha
-            return null;
+            // ✅ MELHORIA: console.error() no lugar de console.log()
+            // Direciona o erro para o canal correto (stderr) e indica gravidade
+            console.error(`[LivroModel] Erro ao listar livros: ${error}`);
+
+            // ✅ MELHORIA: lança o erro ao invés de retornar null
+            // Retornar null "engole" o erro — quem chamou a função não sabe o que houve.
+            // Lançar o erro permite que a camada superior (controller/service) decida
+            // como tratar a falha: exibir mensagem ao usuário, registrar log, etc.
+            throw new Error(`Falha ao buscar livros no banco de dados: ${error}`);
         }
     }
 

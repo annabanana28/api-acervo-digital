@@ -388,14 +388,18 @@ class Aluno {
             if (alunoConsulta && alunoConsulta.status_aluno) {
                 // Query SQL de atualização — cada campo recebe um placeholder "$n"
                 // O WHERE garante que só o aluno com o ID correto seja atualizado
-                const queryAtualizarAluno = `UPDATE Aluno SET 
-                                                    nome = $1, 
-                                                    sobrenome = $2,
-                                                    data_nascimento = $3, 
-                                                    endereco = $4,
-                                                    celular = $5, 
-                                                    email = $6                                            
-                                                WHERE id_aluno = $7`;
+                // ✅ MELHORIA: query reformatada — cada campo na sua própria linha
+                // facilita adicionar/remover campos sem bagunçar o restante da query
+                const queryAtualizarAluno = `
+                    UPDATE Aluno SET
+                        nome            = $1,
+                        sobrenome       = $2,
+                        data_nascimento = $3,
+                        endereco        = $4,
+                        celular         = $5,
+                        email           = $6
+                    WHERE id_aluno = $7;
+                `;
 
                 // Executa a query de atualização com os valores do objeto aluno recebido
                 const respostaBD = await database.query(queryAtualizarAluno, [
@@ -408,17 +412,18 @@ class Aluno {
                     aluno.id_aluno                       // ID do aluno (para o WHERE)
                 ]);
 
-                // Se rowCount for diferente de 0, a atualização funcionou — retorna true
-                if (respostaBD.rowCount != 0) {
-                    return true;
-                }
+                // ✅ MELHORIA: comparação estrita (!= 0) trocada por (??  0) > 0
+                // "rowCount" pode ser null em alguns cenários do driver pg —
+                // o operador "??" garante que null seja tratado como 0, evitando comparações inesperadas
+                return (respostaBD.rowCount ?? 0) > 0;
             }
 
-            // Se o aluno não existe, está inativo, ou o UPDATE não afetou nenhuma linha, retorna false
+            // Se o aluno não existe ou está inativo, retorna false
             return false;
         } catch (error) {
-            // Exibe o erro no console e retorna false em caso de exceção
-            console.log(`Erro na consulta: ${error}`);
+            // ✅ MELHORIA: console.error() no lugar de console.log()
+            // Direciona o erro para o canal correto (stderr) e indica gravidade
+            console.error(`[AlunoModel] Erro ao atualizar aluno: ${error}`);
             return false;
         }
     }

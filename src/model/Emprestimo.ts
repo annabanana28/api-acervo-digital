@@ -362,21 +362,39 @@ class Emprestimo {
         try {
             // Query SQL de atualização — o WHERE garante que apenas o empréstimo com o ID correto seja alterado
             // "RETURNING id_emprestimo" retorna o ID do registro atualizado, confirmando que ele existe
-            const queryUpdateEmprestimo = `UPDATE Emprestimo
-            SET id_aluno = $1, id_livro = $2, data_emprestimo = $3, data_devolucao = $4, status_emprestimo = $5
-            WHERE id_emprestimo = $6
-            RETURNING id_emprestimo;`;
+            // ✅ MELHORIA: query reformatada — cada campo do SET na sua própria linha
+            // facilita adicionar/remover campos sem bagunçar o restante da query
+            const queryUpdateEmprestimo = `
+                UPDATE Emprestimo SET
+                    id_aluno          = $1,
+                    id_livro          = $2,
+                    data_emprestimo   = $3,
+                    data_devolucao    = $4,
+                    status_emprestimo = $5
+                WHERE id_emprestimo = $6
+                RETURNING id_emprestimo;
+            `;
 
-            // Organiza os valores em um array na mesma ordem dos placeholders da query
-            // Repare que id_emprestimo vai por último ($6) pois é usado no WHERE, não no SET
-            const valores = [id_aluno, id_livro, data_emprestimo, data_devolucao, status_emprestimo, id_emprestimo];
+            // ✅ MELHORIA: array de valores com cada item na sua própria linha
+            // Organiza os valores na mesma ordem dos placeholders da query
+            // id_emprestimo vai por último ($6) pois é usado no WHERE, não no SET
+            const valores = [
+                id_aluno,          // $1 — ID do aluno
+                id_livro,          // $2 — ID do livro
+                data_emprestimo,   // $3 — Data do empréstimo
+                data_devolucao,    // $4 — Data de devolução
+                status_emprestimo, // $5 — Status do empréstimo
+                id_emprestimo      // $6 — ID do empréstimo (usado no WHERE)
+            ];
+
             // Executa a query de atualização e armazena o resultado
             const resultado = await database.query(queryUpdateEmprestimo, valores);
 
-            // Se rowCount for 0, nenhuma linha foi alterada — significa que o ID não existe no banco
-            if (resultado.rowCount === 0) {
+            // ✅ MELHORIA: rowCount com ?? 0 para tratar o caso em que rowCount vem null
+            // Se o resultado for 0, nenhuma linha foi alterada — o ID não existe no banco
+            if ((resultado.rowCount ?? 0) === 0) {
                 // Lança um erro manualmente para ser capturado pelo bloco catch abaixo
-                throw new Error('Empréstimo não encontrado.');
+                throw new Error(`Empréstimo ID ${id_emprestimo} não encontrado.`);
             }
 
             // Se chegou até aqui, a atualização foi bem-sucedida — retorna true
@@ -384,7 +402,7 @@ class Emprestimo {
 
         } catch (error) {
             // Captura tanto erros do banco quanto o erro lançado manualmente acima
-            console.error(`Erro ao atualizar empréstimo: ${error}`);
+            console.error(`[EmprestimoModel] Erro ao atualizar empréstimo: ${error}`);
             return false;
         }
     }

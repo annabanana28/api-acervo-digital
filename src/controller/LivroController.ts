@@ -114,15 +114,32 @@ class LivroController extends Livro {
 
     static async remover(req: Request, res: Response): Promise<Response> {
         try {
+            // Lê o parâmetro "id" da URL e converte para número inteiro
+            // Exemplo de URL: DELETE /livro/5  →  idLivro = 5
             const idLivro = parseInt(req.params.id as string);
+
+            // ✅ MELHORIA: validação do ID antes de consultar o banco
+            // Se a URL receber /livro/abc, parseInt retorna NaN — isNaN() detecta isso
+            // e retorna 400 (Bad Request) ao invés de causar erro silencioso no banco
+            if (isNaN(idLivro)) {
+                return res.status(400).json({ mensagem: "ID inválido. Informe um número inteiro." });
+            }
+
+            // Chama o método do model para remover (logicamente) o livro com o ID informado
+            // O model também desativa todos os empréstimos relacionados antes de desativar o livro
             const result = await Livro.removerLivro(idLivro);
+
             if (result) {
-                return res.status(201).json({ mensagem: "Livro removido com sucesso." });
+                // ✅ MELHORIA: status 200 (OK) no lugar de 201 (Created)
+                // 201 é reservado para criação de recursos — remoção deve retornar 200
+                return res.status(200).json({ mensagem: "Livro removido com sucesso." });
             } else {
+                // Retorna status HTTP 404 (Not Found) se o livro não foi encontrado ou já estava inativo
                 return res.status(404).json({ mensagem: "Livro não encontrado para exclusão." });
             }
         } catch (error) {
-            console.error("Erro ao remover o livro: ", error);
+            // ✅ MELHORIA: prefixo [LivroController] para facilitar rastreamento nos logs
+            console.error(`[LivroController] Erro ao remover livro: ${error}`);
             return res.status(500).json({ mensagem: "Erro ao remover o livro." });
         }
     }

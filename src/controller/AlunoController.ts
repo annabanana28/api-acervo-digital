@@ -90,11 +90,20 @@ class AlunoController extends Aluno {
       * @returns Mensagem de sucesso ou erro em formato JSON.
       */
     // Método que recebe os dados do front-end e cria um novo aluno no banco de dados
-    static async cadastrar(req: Request, res: Response) {
+    // ✅ MELHORIA: Promise<Response> adicionado na assinatura
+    // todos os caminhos retornam uma resposta HTTP — tipar isso explicitamente é mais profissional
+    static async cadastrar(req: Request, res: Response): Promise<Response> {
         try {
             // Lê o corpo (body) da requisição HTTP e o tipifica como AlunoDTO
             // O front-end envia os dados do novo aluno no corpo da requisição (geralmente em formato JSON)
             const dadosRecebidos: AlunoDTO = req.body;
+
+            // ✅ MELHORIA: validação dos campos obrigatórios antes de tentar cadastrar
+            // Se nome ou sobrenome não forem enviados, retorna 400 (Bad Request) com mensagem clara
+            // Sem isso, o banco receberia valores undefined e poderia lançar um erro confuso
+            if (!dadosRecebidos.nome || !dadosRecebidos.sobrenome) {
+                return res.status(400).json({ mensagem: "Nome e sobrenome são obrigatórios." });
+            }
 
             // Cria um novo objeto Aluno usando os dados recebidos do front-end
             // O operador "??" define valores padrão caso os campos opcionais não tenham sido enviados
@@ -113,15 +122,15 @@ class AlunoController extends Aluno {
             // Verifica o retorno do model: true = cadastro bem-sucedido, false = falha
             if (result) {
                 // Retorna mensagem de sucesso com status HTTP 201 (Created — recurso criado com sucesso)
-                return res.status(201).json({ mensagem: `Aluno cadastrado com sucesso.` });
+                return res.status(201).json({ mensagem: "Aluno cadastrado com sucesso." });
             } else {
                 // Retorna mensagem de erro com status HTTP 500 se o banco não conseguiu salvar
-                return res.status(500).json({ mensagem: 'Não foi possível cadastrar o aluno no banco de dados.' });
+                return res.status(500).json({ mensagem: "Não foi possível cadastrar o aluno no banco de dados." });
             }
         } catch (error) {
-            // Exibe o erro no console e retorna status HTTP 500 em caso de exceção inesperada
-            console.log(`Erro ao cadastrar o aluno: ${error}`);
-            return res.status(500).json({ mensagem: 'Erro ao cadastrar o aluno.' });
+            // ✅ MELHORIA: console.error() no lugar de console.log() com contexto do controller
+            console.error(`[AlunoController] Erro ao cadastrar aluno: ${error}`);
+            return res.status(500).json({ mensagem: "Erro ao cadastrar o aluno." });
         }
     }
 
@@ -139,21 +148,28 @@ class AlunoController extends Aluno {
             // Exemplo de URL: DELETE /aluno/3  →  idAluno = 3
             const idAluno = parseInt(req.params.id as string);
 
+            // ✅ MELHORIA: validação do ID antes de consultar o banco
+            // Se a URL receber /aluno/abc, parseInt retorna NaN — isNaN() detecta isso
+            // e retorna 400 (Bad Request) ao invés de causar erro silencioso no banco
+            if (isNaN(idAluno)) {
+                return res.status(400).json({ mensagem: "ID inválido. Informe um número inteiro." });
+            }
+
             // Chama o método do model para remover (logicamente) o aluno com o ID informado
             const result = await Aluno.removerAluno(idAluno);
 
             if (result) {
-                // Retorna mensagem de sucesso com status HTTP 201 se a remoção funcionou
-                // ⚠️ Observação: o ideal aqui seria status 200 (OK), pois 201 é para criação de recursos
-                return res.status(201).json({ mensagem: 'Aluno removido com sucesso.' });
+                // ✅ MELHORIA: status 200 (OK) no lugar de 201 (Created)
+                // 201 é reservado para criação de recursos — remoção deve retornar 200
+                return res.status(200).json({ mensagem: "Aluno removido com sucesso." });
             } else {
                 // Retorna status HTTP 404 (Not Found) se o aluno não foi encontrado ou já estava inativo
-                return res.status(404).json({ mensagem: 'Aluno não encontrado para exclusão.' });
+                return res.status(404).json({ mensagem: "Aluno não encontrado para exclusão." });
             }
         } catch (error) {
-            // Exibe o erro no console e retorna status HTTP 500 em caso de exceção
-            console.log(`Erro ao remover aluno: ${error}`)
-            return res.status(500).json({ mensagem: 'Erro ao remover aluno.' });
+            // ✅ MELHORIA: console.error() no lugar de console.log() com contexto do controller
+            console.error(`[AlunoController] Erro ao remover aluno: ${error}`);
+            return res.status(500).json({ mensagem: "Erro ao remover aluno." });
         }
     }
 

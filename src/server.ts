@@ -22,15 +22,17 @@ const server = express();
 // Sem isso, req.body chegaria como undefined nos controllers — nenhum dado do front-end seria lido
 server.use(express.json());
 
-// Registra o middleware CORS com as configurações padrão
-// Na configuração padrão, permite requisições de qualquer origem ("*")
-// Em produção, o ideal seria restringir para apenas os domínios autorizados
+// Registra o middleware CORS com as configurações padrão (permite qualquer origem)
+// ✅ MELHORIA: console.warn alerta ativamente durante o desenvolvimento que o CORS está aberto
+// Em produção, substitua cors() por cors({ origin: "https://seu-dominio.com" })
+// para restringir o acesso apenas aos domínios autorizados
+console.warn("[server] CORS configurado para aceitar qualquer origem. Restrinja em produção.");
 server.use(cors());
 
 // Registra o router com todos os endpoints da aplicação
 // A partir daqui, toda requisição que chegar ao servidor será direcionada para a rota correspondente
 server.use(router);
 
-// Exporta o servidor para que possa ser importado e iniciado em outro arquivo (geralmente o index.ts ou server.ts)
+// Exporta o servidor para que possa ser importado e iniciado em outro arquivo (app.ts)
 // O uso de exportação nomeada "export { server }" mantém consistência com a exportação do router
-export { server }
+export { server };

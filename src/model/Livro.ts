@@ -359,31 +359,39 @@ class Livro {
             if (livro && livro.status_livro) {
                 // Primeiro desativa todos os empréstimos relacionados a este livro
                 // Isso garante a consistência dos dados — um livro removido não pode ter empréstimos ativos
-                const queryDeleteEmprestimoLivro = `UPDATE emprestimo
-                                    SET status_emprestimo_registro = FALSE 
-                                    WHERE id_livro = $1`;
+                // ✅ MELHORIA: query reformatada — SET e WHERE em linhas separadas
+                const queryDeleteEmprestimoLivro = `
+                    UPDATE emprestimo
+                    SET status_emprestimo_registro = FALSE
+                    WHERE id_livro = $1;
+                `;
 
                 // Executa a desativação dos empréstimos do livro (não precisa verificar o resultado aqui)
                 await database.query(queryDeleteEmprestimoLivro, [id_livro]);
 
                 // Agora desativa o próprio livro (remoção lógica — não apaga, apenas muda o status)
-                const queryDeleteLivro = `UPDATE livro
-                          SET status_livro = FALSE 
-                          WHERE id_livro = $1`;
+                // ✅ MELHORIA: query reformatada — mesma padronização da query acima
+                const queryDeleteLivro = `
+                    UPDATE livro
+                    SET status_livro = FALSE
+                    WHERE id_livro = $1;
+                `;
 
                 // Executa a desativação do livro e armazena o resultado
                 const result = await database.query(queryDeleteLivro, [id_livro]);
 
-                // "rowCount" indica quantas linhas foram afetadas pelo UPDATE
-                // Retorna true se pelo menos uma linha foi alterada, false caso contrário
-                return result.rowCount != 0;
+                // ✅ MELHORIA: rowCount com ?? 0 no lugar de != 0
+                // "rowCount" pode ser null em alguns cenários do driver pg —
+                // o operador "??" garante que null seja tratado como 0, evitando comparações inesperadas
+                return (result.rowCount ?? 0) > 0;
             }
 
             // Se o livro não existir ou já estiver inativo, retorna false
             return false;
         } catch (error) {
-            // Exibe o erro no console e retorna false em caso de falha
-            console.log(`Erro na consulta: ${error}`);
+            // ✅ MELHORIA: console.error() no lugar de console.log()
+            // Direciona o erro para o canal correto (stderr) e indica gravidade
+            console.error(`[LivroModel] Erro ao remover livro ID ${id_livro}: ${error}`);
             return false;
         }
     }

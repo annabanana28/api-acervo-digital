@@ -34,14 +34,37 @@ class LivroController extends Livro {
         }
     }
 
-    static async livro(req: Request, res: Response) {
+    // ✅ MELHORIA: Promise<Response> adicionado na assinatura
+    static async livro(req: Request, res: Response): Promise<Response> {
         try {
+            // Lê o parâmetro "id" da URL e converte para número inteiro
             const idLivro = parseInt(req.params.id as string);
+
+            // ✅ MELHORIA: validação do ID antes de consultar o banco
+            // Se a URL receber /livro/abc, parseInt retorna NaN — isNaN() detecta isso
+            // e retorna 400 (Bad Request) ao invés de causar erro silencioso no banco
+            if (isNaN(idLivro)) {
+                return res.status(400).json({ mensagem: "ID inválido. Informe um número inteiro." });
+            }
+
+            // Chama o método do model passando o ID para buscar o livro específico no banco
             const livro = await Livro.listarLivro(idLivro);
+
+            // ✅ MELHORIA: verificação explícita se o livro foi encontrado
+            // Se o model retornar null, responde com 404 (Not Found)
+            // Sem isso, o front-end receberia "null" com status 200, o que é semanticamente incorreto
+            if (!livro) {
+                return res.status(404).json({ mensagem: "Livro não encontrado." });
+            }
+
+            // Retorna o objeto do livro em JSON com status HTTP 200 (OK)
             return res.status(200).json(livro);
         } catch (error) {
-            console.log(`Erro ao acessar método herdado: ${error}`);
-            return res.status(500).json("Erro ao recuperar as informações do livro.");
+            // ✅ MELHORIA: console.error() no lugar de console.log() com contexto do controller
+            // A mensagem anterior era genérica — agora identifica o controller e o método
+            console.error(`[LivroController] Erro ao buscar livro: ${error}`);
+            // ✅ MELHORIA: resposta de erro como objeto JSON ao invés de string simples
+            return res.status(500).json({ mensagem: "Erro ao recuperar as informações do livro." });
         }
     }
 

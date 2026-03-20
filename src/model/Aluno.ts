@@ -7,6 +7,8 @@ import { DatabaseModel } from "./DatabaseModel.js";
 // O "pool" é um conjunto de conexões reutilizáveis, mais eficiente que abrir/fechar uma por vez
 const database = new DatabaseModel().pool;
 
+
+
 // Define a classe Aluno, que representa um aluno no sistema
 class Aluno {
 
@@ -162,50 +164,67 @@ class Aluno {
      * @returns Lista com todos os alunos cadastrados no banco de dados
      */
     // "async" indica que este método é assíncrono — ele pode "esperar" por operações demoradas (como banco de dados)
-    // Retorna uma Promise que, quando resolvida, contém um Array de AlunoDTO ou null
-    static async listarAlunos(): Promise<Array<AlunoDTO> | null> {
-        // Cria uma lista vazia que vai receber os alunos encontrados no banco
-        let listaDeAlunos: Array<AlunoDTO> = [];
-
+    // ✅ MELHORIA: retorno simplificado para AlunoDTO[] (notação moderna, equivalente a Array<AlunoDTO>)
+    // ✅ MELHORIA: erro é lançado ao invés de retornar null — permite que o chamador trate a falha
+    static async listarAlunos(): Promise<AlunoDTO[]> {
         try {
             // Bloco try: tenta executar o código; se algo der errado, vai para o catch
 
-            // Define a query SQL que busca todos os alunos ativos no banco de dados
-            const querySelectAluno = `SELECT * FROM Aluno WHERE status_aluno = TRUE;`;
+            // ✅ MELHORIA: colunas explícitas no lugar de SELECT *
+            // SELECT * busca todas as colunas do banco — se houver colunas pesadas ou desnecessárias,
+            // isso aumenta o tráfego de dados sem necessidade. Listar as colunas é mais seguro e eficiente.
+            const querySelectAluno = `
+                SELECT
+                    id_aluno,
+                    ra,
+                    nome,
+                    sobrenome,
+                    data_nascimento,
+                    endereco,
+                    email,
+                    celular,
+                    status_aluno
+                FROM Aluno
+                WHERE status_aluno = TRUE;
+            `;
 
             // Executa a query no banco de dados e aguarda o resultado
             // "await" pausa a execução aqui até o banco responder
             const respostaBD = await database.query(querySelectAluno);
 
-            // Percorre cada linha retornada pelo banco de dados
-            // "aluno" é o apelido dado a cada linha individual retornada
-            respostaBD.rows.forEach((aluno: any) => {
-
-                // Cria um objeto AlunoDTO com os dados de cada linha do banco
-                // AlunoDTO é apenas um objeto simples de dados (sem métodos), diferente da classe Aluno
-                const alunoDTO: AlunoDTO = {
-                    id_aluno: aluno.id_aluno,               // ID do aluno
-                    ra: aluno.ra,                           // Registro Acadêmico
-                    nome: aluno.nome,                       // Nome
-                    sobrenome: aluno.sobrenome,             // Sobrenome
-                    data_nascimento: aluno.data_nascimento, // Data de nascimento
-                    endereco: aluno.endereco,               // Endereço
-                    email: aluno.email,                     // E-mail
-                    celular: aluno.celular,                 // Celular
-                    status_aluno: aluno.status_aluno        // Status ativo/inativo
-                };
-
-                // Adiciona o objeto AlunoDTO à lista
-                listaDeAlunos.push(alunoDTO);
-            });
+            // ✅ MELHORIA: .map() substitui o forEach + push manual
+            // .map() percorre o array e já retorna um novo array transformado,
+            // sem precisar criar uma lista vazia e empurrar item por item.
+            // É mais legível, funcional e elimina a necessidade de uma variável mutável (let).
+            // O "any" é necessário aqui pois o TypeScript não consegue inferir os tipos
+            // retornados pelo banco em tempo de compilação — padrão usado no restante do arquivo.
+            const listaDeAlunos: AlunoDTO[] = respostaBD.rows.map((aluno: any): AlunoDTO => ({
+                id_aluno:        aluno.id_aluno,          // ID do aluno
+                ra:              aluno.ra,                // Registro Acadêmico
+                nome:            aluno.nome,              // Nome
+                sobrenome:       aluno.sobrenome,         // Sobrenome
+                data_nascimento: aluno.data_nascimento,   // Data de nascimento
+                endereco:        aluno.endereco,          // Endereço
+                email:           aluno.email,             // E-mail
+                celular:         aluno.celular,           // Celular
+                status_aluno:    aluno.status_aluno       // Status ativo/inativo
+            }));
 
             // Retorna a lista com todos os alunos encontrados
             return listaDeAlunos;
+
         } catch (error) {
-            // Se ocorrer qualquer erro durante a consulta, exibe no console para facilitar o debug
-            console.log(`Erro ao acessar o modelo: ${error}`);
-            // Retorna null para indicar que houve falha
-            return null;
+            // ✅ MELHORIA: console.error() no lugar de console.log()
+            // console.error() direciona a mensagem para o canal de erros (stderr),
+            // o que facilita a separação de logs em ferramentas de monitoramento
+            // (ex: Datadog, CloudWatch, PM2) e indica a gravidade corretamente
+            console.error(`[AlunoModel] Erro ao listar alunos: ${error}`);
+
+            // ✅ MELHORIA: lança o erro ao invés de retornar null
+            // Retornar null "engole" o erro — quem chamou a função não sabe o que houve.
+            // Lançar o erro permite que a camada superior (controller/service) decida
+            // como tratar a falha: exibir mensagem ao usuário, registrar log, etc.
+            throw new Error(`Falha ao buscar alunos no banco de dados: ${error}`);
         }
     }
 
@@ -265,27 +284,35 @@ class Aluno {
         try {
             // Query SQL de inserção — os "$1", "$2"... são placeholders substituídos pelos valores reais
             // "RETURNING id_aluno" faz o banco retornar o ID gerado automaticamente após o INSERT
-            const queryInsertAluno = `INSERT INTO Aluno (nome, sobrenome, data_nascimento, endereco, email, celular)
-                                VALUES ($1, $2, $3, $4, $5, $6) RETURNING id_aluno;`;
+            const queryInsertAluno = `
+                INSERT INTO Aluno (nome, sobrenome, data_nascimento, endereco, email, celular)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id_aluno;
+            `;
 
-            // Executa a query passando os valores do objeto aluno
+            // ✅ MELHORIA: parâmetros alinhados verticalmente — cada valor na sua própria linha
+            // facilita a leitura e a manutenção (ex: adicionar/remover um campo sem bagunçar o resto)
             // .toUpperCase() converte texto para maiúsculas; .toLowerCase() converte para minúsculas
-            const result = await database.query(queryInsertAluno, [aluno.getNome().toUpperCase(),
-            aluno.getSobrenome().toUpperCase(),     // Sobrenome em maiúsculas
-            aluno.getDataNascimento(),              // Data de nascimento sem transformação
-            aluno.getEndereco().toUpperCase(),      // Endereço em maiúsculas
-            aluno.getEmail().toLowerCase(),         // E-mail em minúsculas
-            aluno.getCelular()]);                   // Celular sem transformação
+            const result = await database.query(queryInsertAluno, [
+                aluno.getNome().toUpperCase(),       // Nome em maiúsculas
+                aluno.getSobrenome().toUpperCase(),  // Sobrenome em maiúsculas
+                aluno.getDataNascimento(),           // Data de nascimento sem transformação
+                aluno.getEndereco().toUpperCase(),   // Endereço em maiúsculas
+                aluno.getEmail().toLowerCase(),      // E-mail em minúsculas
+                aluno.getCelular()                   // Celular sem transformação
+            ]);
 
-            // Verifica se o banco retornou pelo menos uma linha (ou seja, o INSERT funcionou)
-            if (result.rows.length > 0) {
+            // ✅ MELHORIA: rowCount no lugar de result.rows.length > 0
+            // "rowCount" é a forma semântica correta para verificar linhas afetadas em INSERT/UPDATE/DELETE
+            // "rows.length" funciona aqui por causa do RETURNING, mas rowCount é mais explícito e direto
+            if (result.rowCount && result.rowCount > 0) {
                 // Exibe no console o ID do aluno recém-cadastrado
                 console.log(`Aluno cadastrado com sucesso. ID: ${result.rows[0].id_aluno}`);
                 // Retorna true para indicar sucesso
                 return true;
             }
 
-            // Se nenhuma linha foi retornada, o cadastro não funcionou — retorna false
+            // Se nenhuma linha foi afetada, o cadastro não funcionou — retorna false
             return false;
         } catch (error) {
             // Captura e exibe qualquer erro ocorrido durante o cadastro
@@ -356,12 +383,12 @@ class Aluno {
                 // Query SQL de atualização — cada campo recebe um placeholder "$n"
                 // O WHERE garante que só o aluno com o ID correto seja atualizado
                 const queryAtualizarAluno = `UPDATE Aluno SET 
-                                                    nome = '$1', 
-                                                    sobrenome = '$2',
-                                                    data_nascimento = '$3', 
-                                                    endereco = '$4',
-                                                    celular = '$5', 
-                                                    email = '$6'                                            
+                                                    nome = $1, 
+                                                    sobrenome = $2,
+                                                    data_nascimento = $3, 
+                                                    endereco = $4,
+                                                    celular = $5, 
+                                                    email = $6                                            
                                                 WHERE id_aluno = $7`;
 
                 // Executa a query de atualização com os valores do objeto aluno recebido

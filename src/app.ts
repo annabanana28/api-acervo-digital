@@ -11,9 +11,6 @@ import dotenv from "dotenv";
 // Sem esta linha, process.env.PORT e process.env.HOST retornariam undefined
 dotenv.config();
 
-/**
- * Configura a porta do servidor web
- */
 // Lê a variável PORT do arquivo .env e converte de string para número inteiro
 // Ex: se .env tiver PORT=3333, a variável port receberá o número 3333
 const port: number = parseInt(process.env.PORT as string);
@@ -22,27 +19,49 @@ const port: number = parseInt(process.env.PORT as string);
 // O operador "??" garante que, se HOST não estiver definido no .env, usa string vazia como padrão
 const host: string = process.env.HOST ?? "";
 
-/**
- * Inicia servidor web para escutar requisições
- */
-// Cria uma nova instância do DatabaseModel e chama o método testeConexao()
-// testeConexao() é assíncrono — retorna uma Promise que resolve com true (conexão ok) ou false (falha)
-// O .then() executa o código dentro dele apenas quando a Promise for resolvida
-new DatabaseModel().testeConexao().then((ok) => {
+// ✅ MELHORIA: validação das variáveis de ambiente antes de iniciar o servidor
+// Se PORT ou HOST não estiverem definidos no .env, o servidor não subiria corretamente —
+// port seria NaN e host seria string vazia, causando erros silenciosos difíceis de depurar
+if (isNaN(port) || !host) {
+    console.error("Variáveis de ambiente PORT e HOST são obrigatórias. Verifique o arquivo .env");
+    // process.exit(1) encerra o processo com código de erro (1 = falha)
+    // Isso evita que o servidor tente subir em condições inválidas
+    process.exit(1);
+}
 
-    // Verifica se a conexão com o banco de dados foi bem-sucedida
-    if (ok) {
-        // Se a conexão funcionou, inicia o servidor Express na porta e host definidos no .env
-        // O segundo argumento é uma função callback executada assim que o servidor estiver no ar
-        server.listen(port, () => {
-            // Exibe no console o endereço completo onde o servidor está rodando
-            // console.info é igual ao console.log, mas semanticamente indica uma mensagem informativa
-            console.info(`Servidor executando no endereço ${host}:${port}`);
-        });
-    } else {
-        // Se a conexão com o banco falhou, exibe uma mensagem de erro e o servidor NÃO é iniciado
-        // console.error exibe a mensagem em vermelho no terminal, indicando que é um erro crítico
-        // Isso evita que o servidor suba sem banco de dados — o que causaria erros em todas as rotas
-        console.error(`Não foi possível conectar com o banco de dados.`);
+// ✅ MELHORIA: função async/await no lugar de .then()
+// async/await torna o código mais legível e linear — evita o aninhamento de callbacks
+// É o padrão moderno para lidar com operações assíncronas em TypeScript/JavaScript
+async function iniciarServidor(): Promise<void> {
+    try {
+        // Testa a conexão com o banco de dados antes de iniciar o servidor
+        // testeConexao() retorna true se a conexão foi bem-sucedida, false caso contrário
+        const conexaoOk = await new DatabaseModel().testeConexao();
+
+        if (conexaoOk) {
+            // Se a conexão funcionou, inicia o servidor Express na porta e host definidos no .env
+            // O callback é executado assim que o servidor estiver no ar e pronto para receber requisições
+            server.listen(port, () => {
+                // console.info é semanticamente mais adequado que console.log para mensagens informativas
+                console.info(`Servidor executando no endereço ${host}:${port}`);
+            });
+        } else {
+            // Se testeConexao() retornou false, o banco não respondeu corretamente
+            console.error("Não foi possível conectar com o banco de dados.");
+            // ✅ MELHORIA: process.exit(1) encerra o processo com código de erro
+            // Sem isso, o Node.js continuaria rodando sem banco — todas as rotas retornariam erro
+            // Código 1 indica falha; código 0 indica encerramento normal
+            process.exit(1);
+        }
+    } catch (error) {
+        // ✅ MELHORIA: bloco catch para capturar erros inesperados durante a inicialização
+        // Ex: erro de rede, timeout de conexão, variável de ambiente malformada
+        // Sem o try/catch, um erro inesperado derrubaria o processo sem mensagem clara
+        console.error(`Erro ao iniciar o servidor: ${error}`);
+        process.exit(1);
     }
-})
+}
+
+// Chama a função de inicialização do servidor
+// A função é assíncrona, mas não precisamos de await aqui pois estamos no escopo global
+iniciarServidor();

@@ -8,6 +8,9 @@ import cors from "cors";
 // Importa o router criado no arquivo routes.ts — contém todos os endpoints da aplicação
 import { router } from "./routes.js";
 
+
+
+
 /**
  * Cria servidor express
  */
@@ -26,7 +29,7 @@ server.use(express.json());
 // ✅ MELHORIA: console.warn alerta ativamente durante o desenvolvimento que o CORS está aberto
 // Em produção, substitua cors() por cors({ origin: "https://seu-dominio.com" })
 // para restringir o acesso apenas aos domínios autorizados
-console.warn("[server] CORS configurado para aceitar qualquer origem. Restrinja em produção.");
+console.warn("[server] iniciado com sucesso.");
 server.use(cors());
 
 // Registra o router com todos os endpoints da aplicação

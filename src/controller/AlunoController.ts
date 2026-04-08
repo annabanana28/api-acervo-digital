@@ -5,13 +5,14 @@ import type AlunoDTO from "../dto/AlunoDTO.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
-// função simples para validar domínio do email
+// validar domínio do email
 function validarEmail(email: string): boolean {
     return email.endsWith("@adigital.com.br");
 }
 
 class AlunoController extends Aluno {
 
+    // ================= LOGIN =================
     static async login(req: Request, res: Response): Promise<Response> {
         try {
             const { email, senha } = req.body;
@@ -52,7 +53,7 @@ class AlunoController extends Aluno {
         }
     }
 
-   
+    // ================= LISTAR =================
     static async todos(req: Request, res: Response): Promise<Response> {
         try {
             const listaDeAlunos = await Aluno.listarAlunos();
@@ -68,13 +69,13 @@ class AlunoController extends Aluno {
         }
     }
 
-   
+    // ================= BUSCAR =================
     static async aluno(req: Request, res: Response): Promise<Response> {
         try {
             const idAluno = parseInt(req.params.id as string);
 
             if (isNaN(idAluno)) {
-                return res.status(400).json({ mensagem: "ID inválido. Informe um número inteiro." });
+                return res.status(400).json({ mensagem: "ID inválido." });
             }
 
             const aluno = await Aluno.listarAluno(idAluno);
@@ -86,42 +87,39 @@ class AlunoController extends Aluno {
             return res.status(200).json(aluno);
         } catch (error) {
             console.error(`[AlunoController] Erro ao buscar aluno: ${error}`);
-            return res.status(500).json({ mensagem: "Erro ao recuperar as informações do aluno." });
+            return res.status(500).json({ mensagem: "Erro ao recuperar aluno." });
         }
     }
 
-    
+    // ================= CADASTRAR =================
     static async cadastrar(req: Request, res: Response): Promise<Response> {
         try {
-            const dadosRecebidos: AlunoDTO = req.body;
+            const dados: AlunoDTO = req.body;
 
-            if (!dadosRecebidos.nome || !dadosRecebidos.sobrenome) {
-                return res.status(400).json({ mensagem: "Nome e sobrenome são obrigatórios." });
+            // 🔥 NOVA VALIDAÇÃO (SEM SOBRENOME OBRIGATÓRIO)
+            if (!dados.nome || !dados.email || !dados.senha) {
+                return res.status(400).json({
+                    mensagem: "Nome, email e senha são obrigatórios."
+                });
             }
 
-            if (!dadosRecebidos.email || !dadosRecebidos.senha) {
-                return res.status(400).json({ mensagem: "Email e senha são obrigatórios." });
-            }
-
-            if (!validarEmail(dadosRecebidos.email)) {
+            if (!validarEmail(dados.email)) {
                 return res.status(400).json({
                     mensagem: "Email deve ser @adigital.com.br"
                 });
             }
 
-            // 🔐 hash da senha
-            const senhaHash = await bcrypt.hash(dadosRecebidos.senha, 10);
+            const senhaHash = await bcrypt.hash(dados.senha, 10);
 
             const novoAluno = new Aluno(
-                dadosRecebidos.nome,
-                dadosRecebidos.sobrenome,
-                dadosRecebidos.data_nascimento ?? new Date("1900-01-01"),
-                dadosRecebidos.endereco ?? '',
-                dadosRecebidos.email,
-                dadosRecebidos.celular
+                dados.nome,
+                dados.sobrenome ?? "", // 👈 agora opcional
+                dados.data_nascimento ?? new Date("1900-01-01"),
+                dados.endereco ?? "",
+                dados.email,
+                dados.celular
             );
 
-            
             novoAluno.setSenha(senhaHash);
 
             const result = await Aluno.cadastrarAluno(novoAluno);
@@ -134,10 +132,11 @@ class AlunoController extends Aluno {
 
         } catch (error) {
             console.error(`[AlunoController] Erro ao cadastrar aluno: ${error}`);
-            return res.status(500).json({ mensagem: "Erro ao cadastrar o aluno." });
+            return res.status(500).json({ mensagem: "Erro ao cadastrar aluno." });
         }
     }
 
+    // ================= REMOVER =================
     static async remover(req: Request, res: Response): Promise<Response> {
         try {
             const idAluno = parseInt(req.params.id as string);
@@ -159,6 +158,7 @@ class AlunoController extends Aluno {
         }
     }
 
+    // ================= ATUALIZAR =================
     static async atualizar(req: Request, res: Response): Promise<Response> {
         try {
             const idAluno = parseInt(req.params.id as string);
@@ -167,19 +167,19 @@ class AlunoController extends Aluno {
                 return res.status(400).json({ mensagem: "ID inválido." });
             }
 
-            const dadosRecebidos: AlunoDTO = req.body;
+            const dados: AlunoDTO = req.body;
 
-            if (!dadosRecebidos.nome || !dadosRecebidos.sobrenome) {
-                return res.status(400).json({ mensagem: "Nome e sobrenome são obrigatórios." });
+            if (!dados.nome) {
+                return res.status(400).json({ mensagem: "Nome é obrigatório." });
             }
 
             const aluno = new Aluno(
-                dadosRecebidos.nome,
-                dadosRecebidos.sobrenome,
-                dadosRecebidos.data_nascimento ?? new Date("1900-01-01"),
-                dadosRecebidos.endereco ?? '',
-                dadosRecebidos.email ?? '',
-                dadosRecebidos.celular
+                dados.nome,
+                dados.sobrenome ?? "",
+                dados.data_nascimento ?? new Date("1900-01-01"),
+                dados.endereco ?? "",
+                dados.email ?? "",
+                dados.celular
             );
 
             aluno.setIdAluno(idAluno);
@@ -191,6 +191,7 @@ class AlunoController extends Aluno {
             } else {
                 return res.status(404).json({ mensagem: "Aluno não encontrado." });
             }
+
         } catch (error) {
             console.error(`[AlunoController] Erro ao atualizar aluno: ${error}`);
             return res.status(500).json({ mensagem: "Erro ao atualizar aluno." });
